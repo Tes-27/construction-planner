@@ -1,0 +1,6 @@
+# Construction Planner — Python 3.9 ขึ้นไป
+flask>=2.2
+openpyxl>=3.1
+pillow>=9.0
+# ใช้ตอนแปลงแบบ PDF เป็นรูป (ingest โครงการใหม่) — แทน pdftoppm ใช้ได้ทั้ง Windows/Mac
+pymupdf>=1.23

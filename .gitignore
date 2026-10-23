@@ -1,0 +1,13 @@
+# Python / ระบบ
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ไฟล์ชั่วคราวตอนแปลงข้อมูลโครงการ
+projects/*/ingest/tmp/
+
+# ไฟล์ Office ที่เปิดค้าง
+~$*

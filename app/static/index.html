@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construction Planner</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <span class="brand">Construction Planner<small id="projName"></small></span>
+    <select id="projSel" title="เลือกโครงการ"></select>
+    <span class="spacer"></span>
+    <label class="small muted" for="dataDate">ข้อมูล ณ วันที่</label>
+    <input type="date" id="dataDate">
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-v="overview" class="on">ภาพรวม</button>
+    <button data-v="gantt">Gantt</button>
+    <button data-v="progress">กรอกความคืบหน้า</button>
+    <button data-v="plan">แบบแปลน</button>
+    <button data-v="scurve">S-Curve</button>
+    <button data-v="milestones">งวดงาน</button>
+    <button data-v="changes">VO / EOT</button>
+    <button data-v="boq">BOQ</button>
+  </nav>
+</header>
+<main>
+  <section class="view on" id="v-overview">
+    <div class="cards" id="kpis"></div>
+    <div class="grid2">
+      <div class="panel"><h3>S-Curve (ทั้งโครงการ)</h3><div id="miniCurve"></div></div>
+      <div class="panel"><h3>งวดงานถัดไป</h3><div id="nextMs"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>ตรวจความถูกต้องของข้อมูล</h3><ul class="issues" id="validation"></ul></div>
+      <div class="panel">
+        <h3>สมมติฐานที่ต้องยืนยัน</h3><ul class="issues" id="assumptions"></ul>
+        <h3 style="margin-top:16px">ข้อสังเกตจากไฟล์ต้นฉบับ</h3><ul class="issues" id="srcIssues"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-gantt">
+    <div class="toolbar">
+      <span class="seg" id="gGroup"><button data-g="time" class="on">ตามเวลา</button><button data-g="floor">ตามชั้น</button><button data-g="task">ตามหมวดงาน</button></span>
+      <span class="seg" id="gZoom"><button data-z="2">ปี</button><button data-z="4" class="on">เดือน</button><button data-z="9">สัปดาห์</button></span>
+      <label class="small"><input type="checkbox" id="gCrit"> เฉพาะสายงานวิกฤต</label>
+      <span class="spacer"></span>
+      <span class="small muted" id="gInfo"></span>
+      <button id="btnBaseline">ล็อก Baseline</button>
+      <button id="btnXlsx">Export Excel</button>
+      <button id="btnPrint">พิมพ์</button>
+    </div>
+    <div class="legend" style="margin-bottom:8px">
+      <span><i style="background:var(--str)"></i>โครงสร้าง</span><span><i style="background:var(--arch)"></i>สถาปัตย์</span>
+      <span><i style="background:var(--ee)"></i>ไฟฟ้า</span><span><i style="background:var(--sn)"></i>สุขาภิบาล</span>
+      <span><i style="background:var(--prelim)"></i>เตรียมการ</span>
+      <span><i style="background:#c3cad3;height:4px"></i>Baseline</span>
+      <span><i style="background:#fff;border:2px solid var(--danger)"></i>สายงานวิกฤต</span>
+      <span>◆ งวดงาน (เขียว = เงื่อนไขครบ)</span>
+    </div>
+    <div class="gantt" id="gantt">
+      <div class="g-lh"><div class="g-row" style="border:0;cursor:default;width:100%;font-weight:600">
+        <span class="g-c name">กิจกรรม</span><span class="g-c w1">วัน</span><span class="g-c w2">เริ่ม</span><span class="g-c w2">เสร็จ</span><span class="g-c w3">%</span></div></div>
+      <div class="g-rh" id="gHead"></div>
+      <div class="g-lb" id="gLeft"></div>
+      <div class="g-rb" id="gRight"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-progress">
+    <div class="toolbar">
+      <div class="floor-tabs" id="floorTabs"></div>
+      <span class="spacer"></span>
+      <span class="legend"><span><i class="p0"></i>0</span><span><i class="p1"></i>1–29</span><span><i class="p2"></i>30–59</span><span><i class="p3"></i>60–89</span><span><i class="p4"></i>90–99</span><span><i class="p5"></i>100</span></span>
+    </div>
+    <p class="small muted" style="margin:0 0 8px">แตะช่องเพื่อบันทึก % ของห้องนั้น · แตะหัวคอลัมน์เพื่อบันทึกทั้งชั้นพร้อมกัน · บันทึกเป็นของวันที่ "ข้อมูล ณ วันที่" ด้านบน</p>
+    <div class="pg-wrap"><table class="pg" id="pgTable"></table></div>
+  </section>
+
+  <section class="view" id="v-plan">
+    <div class="toolbar">
+      <div class="floor-tabs" id="planFloors"></div>
+      <span class="spacer"></span>
+      <span class="seg" id="planMode"><button data-m="actual" class="on">ผลงาน</button><button data-m="diff">เทียบแผน</button></span>
+      <select id="planTrade"><option value="">ทุกหมวด (ถ่วงมูลค่า)</option><option value="STR">โครงสร้าง</option><option value="ARCH">สถาปัตย์</option><option value="EE">ไฟฟ้า</option><option value="SN">สุขาภิบาล</option><option value="PRELIM">เตรียมการ</option></select>
+      <select id="planTask"><option value="">— ทุกหมวดงานย่อย —</option></select>
+      <label class="small"><input type="checkbox" id="planLabels" checked> แสดงตัวเลข</label>
+      <button id="planEdit">แก้ขอบเขต</button>
+    </div>
+    <div class="legend" id="planLegend" style="margin-bottom:8px"></div>
+    <div class="plan-layout">
+      <div class="plan-wrap" id="planWrap"></div>
+      <aside class="plan-side" id="planSide"></aside>
+    </div>
+  </section>
+
+  <section class="view" id="v-scurve">
+    <div class="toolbar">
+      <label class="small">หมวด</label>
+      <select id="scTrade"><option value="">ทั้งโครงการ</option><option value="PRELIM">เตรียมการ</option><option value="STR">โครงสร้าง</option><option value="ARCH">สถาปัตย์</option><option value="EE">ไฟฟ้า</option><option value="SN">สุขาภิบาล</option></select>
+      <span class="spacer"></span><span class="small muted" id="scInfo"></span>
+    </div>
+    <div class="panel"><div class="chart-wrap" id="scChart"></div></div>
+    <div class="panel"><h3>ตารางรายเดือน</h3><div class="tbl-wrap" id="scTable"></div></div>
+  </section>
+
+  <section class="view" id="v-milestones">
+    <div id="msSummary"></div>
+    <div class="toolbar"><span class="small muted">เงื่อนไขของแต่ละงวดตรวจจากความคืบหน้าจริง ณ วันที่ข้อมูล · วันที่คาดว่าเบิกได้ = วันเสร็จของกิจกรรมที่เกี่ยวข้องตามแผนที่ปรับตามความคืบหน้าแล้ว</span></div>
+    <div id="msList"></div>
+  </section>
+
+  <section class="view" id="v-changes">
+    <div class="cards" id="chgCards"></div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="toolbar"><h3 style="margin:0">งานเพิ่ม-ลด (VO)</h3><span class="spacer"></span><button class="primary" id="btnVoAdd">+ เพิ่ม VO</button></div>
+        <p class="small muted" style="margin:0 0 8px">เฉพาะ VO ที่ "อนุมัติ" จึงเพิ่มมูลค่าสัญญา หมวดงาน แท่ง Gantt และรายการเบิก · งานลดหักได้ทันทีในงวดถัดไป</p>
+        <div id="voList"></div>
+      </div>
+      <div class="panel">
+        <div class="toolbar"><h3 style="margin:0">ขอขยายเวลา (EOT)</h3><span class="spacer"></span><button class="primary" id="btnEotAdd">+ เพิ่ม EOT</button></div>
+        <div id="eotList"></div>
+        <h3 style="margin-top:18px">ค่าปรับล่าช้า</h3>
+        <div class="row"><label>ค่าปรับต่อวัน</label><input id="ldDay" type="number" step="100" style="max-width:160px"> <span class="small muted">บาท/วัน (ว่าง = 0.1% ของสัญญารวม VAT)</span></div>
+        <div class="row"><label>เพดาน</label><input id="ldCap" type="number" step="1" style="max-width:80px"> <span class="small muted">% ของมูลค่าสัญญารวม VAT</span></div>
+        <div class="actions" style="justify-content:flex-start"><button id="ldSave">บันทึกค่าปรับ</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-boq">
+    <div class="toolbar">
+      <input id="boqQ" placeholder="ค้นหา รหัส / รายการ / หมวดงาน" style="min-width:260px">
+      <select id="boqTrade"><option value="">ทุกหมวด</option><option>PRELIM</option><option>STR</option><option>ARCH</option><option>EE</option><option>SN</option><option>FP</option></select>
+      <label class="small"><input type="checkbox" id="boqIn" checked> เฉพาะในขอบเขต</label>
+      <span class="spacer"></span><span class="small muted" id="boqInfo"></span>
+    </div>
+    <div class="panel tbl-wrap" style="padding:0"><table class="t" id="boqTable"></table></div>
+  </section>
+</main>
+
+<div class="pop-bg" id="popBg"><div class="pop" id="pop"></div></div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "planner-windows",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app/server.py", "machi-demo"],
+      "port": 5070
+    },
+    {
+      "name": "planner-mac",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["app/server.py", "machi-demo"],
+      "port": 5070
+    }
+  ]
+}

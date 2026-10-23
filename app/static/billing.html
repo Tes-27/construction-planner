@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ใบขอเบิกเงินงวด</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #111; --ink2: #444; --line: #888; --soft: #f1f3f5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9ecef; font-family: "Sarabun", "Thonburi", "Sukhumvit Set", sans-serif; color: var(--ink); font-size: 14px; }
+  .tools { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid #ddd; padding: 10px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-family: -apple-system, "Sukhumvit Set", sans-serif; font-size: 13px; }
+  .tools button, .tools input { font: inherit; padding: 6px 12px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+  .tools button.primary { background: #2f6fdf; color: #fff; border-color: #2f6fdf; }
+  .tools .warn { color: #a12b2b; font-weight: 600; }
+  .page { width: 210mm; min-height: 297mm; margin: 16px auto; background: #fff; padding: 18mm 18mm 16mm; box-shadow: 0 2px 10px rgba(0,0,0,.12); position: relative; }
+  .draft::before { content: "ร่าง — เงื่อนไขงวดยังไม่ครบ"; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 44px; color: rgba(214, 69, 69, .13); font-weight: 700; white-space: nowrap; pointer-events: none; }
+  h1 { font-size: 20px; text-align: center; margin: 0 0 14px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  .meta { display: flex; justify-content: space-between; margin-bottom: 10px; }
+  p { margin: 6px 0; line-height: 1.6; }
+  .indent { text-indent: 2.5em; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 4px 6px; vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.b td { font-weight: 700; }
+  tr.this td { background: #fff4d6; }
+  tr.sub td { background: #f8f9fa; font-weight: 600; }
+  .bt { text-align: center; font-weight: 600; margin: 6px 0 12px; }
+  .sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 46px; text-align: center; font-size: 13px; }
+  .sign div span { display: block; margin-top: 4px; color: var(--ink2); }
+  .small { font-size: 12px; color: var(--ink2); }
+  .ok { color: #17683b; font-weight: 700; } .no { color: #a12b2b; font-weight: 700; }
+  .mx td, .mx th { padding: 2px 3px; font-size: 11px; text-align: center; }
+  .mx td:first-child, .mx th:first-child { text-align: left; }
+  .c0 { color: #999; } .c1 { background: #fde7c2; } .c2 { background: #fbc56b; } .c3 { background: #cfe9e2; } .c4 { background: #8fd0b5; } .c5 { background: #4cb08f; color: #fff; }
+  .pg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pg figure { margin: 0; break-inside: avoid; }
+  .pg img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: 1px solid #ccc; display: block; }
+  .pg figcaption { font-size: 11px; color: var(--ink2); margin-top: 2px; line-height: 1.35; }
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .tools { display: none; }
+    .page { margin: 0; box-shadow: none; page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+    th, .c1, .c2, .c3, .c4, .c5, tr.this td, tr.sub td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="tools">
+  <button onclick="history.length > 1 ? history.back() : window.close()">← กลับ</button>
+  <label>ผลงาน ณ วันที่ <input type="date" id="ev"></label>
+  <span id="st"></span>
+  <span style="flex:1"></span>
+  <button id="xl">Excel</button>
+  <button class="primary" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+</div>
+<div id="doc"></div>
+<script>
+const no = decodeURIComponent(location.pathname.split("/").pop());
+const qs = new URLSearchParams(location.search);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const m2 = v => Number(v || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const m0 = v => Number(v || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 });
+const pc = (v, d = 1) => v == null ? "" : Number(v).toFixed(d) + "%";
+const fd = s => s ? new Date(s + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : "";
+const cls = p => p <= 0 ? "c0" : p < 30 ? "c1" : p < 60 ? "c2" : p < 90 ? "c3" : p < 100 ? "c4" : "c5";
+const STAT = { this: "งวดนี้", paid: "ได้รับเงินแล้ว", approved: "อนุมัติแล้ว", submitted: "ยื่นแล้ว", ready: "พร้อมเบิก", planned: "–" };
+
+async function load() {
+  const d = qs.get("date");
+  const r = await (await fetch(`/api/billing_report/${encodeURIComponent(no)}` + (d ? `?date=${d}` : ""))).json();
+  if (r.error) { document.getElementById("doc").innerHTML = `<div class="page"><p>${esc(r.error)}</p></div>`; return; }
+  document.getElementById("ev").value = r.evidence_date;
+  document.getElementById("st").innerHTML = r.draft ? `<span class="warn">เงื่อนไขงวดยังไม่ครบ ณ วันที่นี้ — เอกสารแสดงเป็นร่าง</span>` : `<span style="color:#17683b">✓ เงื่อนไขงวดครบ</span>`;
+  document.title = `ขอเบิกงวด ${r.milestone.no} · ${r.meta.name}`;
+  render(r);
+}
+document.getElementById("ev").onchange = e => { qs.set("date", e.target.value); history.replaceState(null, "", "?" + qs); load(); };
+document.getElementById("xl").onclick = () => { location.href = `/api/export/billing/${encodeURIComponent(no)}.xlsx?date=${document.getElementById("ev").value}`; };
+
+function render(r) {
+  const m = r.milestone, mm = r.money, M = r.meta, dr = r.draft ? " draft" : "";
+  const vatP = (M.vat_rate * 100).toFixed(0), retP = (M.retention_rate * 100).toFixed(0), whtP = (M.wht_rate * 100).toFixed(0);
+  const p1 = `<div class="page${dr}">
+    <h1>หนังสือขอเบิกเงินค่างวดงาน</h1>
+    <div class="meta"><span>เลขที่ ${esc(m.invoice_no) || "...................."}</span><span>วันที่ ${esc(r.doc_date_th)}</span></div>
+    <p><b>เรื่อง</b> ขอเบิกเงินค่าจ้าง${/^VO/.test(m.no) ? "งานเปลี่ยนแปลง " : "งวดที่ "}${esc(m.no)}</p>
+    <p><b>เรียน</b> ${esc(M.owner)}${M.owner_address ? "<br><span class='small'>" + esc(M.owner_address) + "</span>" : ""}</p>
+    <p class="indent">ตามที่ ${esc(M.owner)} (ผู้ว่าจ้าง) ได้ว่าจ้าง ${esc(M.contractor)} (ผู้รับจ้าง)
+      ให้ดำเนินการก่อสร้างโครงการ ${esc(M.name)}${M.location ? " ณ " + esc(M.location) : ""}${M.contract_no ? " ตามสัญญาเลขที่ " + esc(M.contract_no) : ""}
+      มูลค่าสัญญา ${m2(r.contract_gross)} บาท (รวมภาษีมูลค่าเพิ่ม) ระยะเวลาก่อสร้างตั้งแต่ ${esc(r.start_th)} ถึง ${esc(r.finish_th)} นั้น</p>
+    <p class="indent">บัดนี้ผู้รับจ้างได้ดำเนินงานงวดที่ ${esc(m.no)} (${(m.pct * 100).toFixed(0)}% ของมูลค่าสัญญา)
+      ${r.draft ? "<b>(เงื่อนไขยังไม่ครบ)</b>" : "แล้วเสร็จตามเงื่อนไข"} ณ วันที่ ${esc(r.evidence_date_th)} ได้แก่ ${esc(m.description)}
+      รายละเอียดตามเอกสารแนบ จึงขอเบิกเงินค่างวดงาน ดังนี้</p>
+    <table>
+      <tr><td>(1) มูลค่างวดงาน (ไม่รวมภาษีมูลค่าเพิ่ม)</td><td class="n">${m2(mm.amount)}</td></tr>
+      <tr><td>(2) ภาษีมูลค่าเพิ่ม ${vatP}%</td><td class="n">${m2(mm.vat)}</td></tr>
+      <tr class="b"><td>(3) รวมทั้งสิ้น</td><td class="n">${m2(mm.gross)}</td></tr>
+      <tr><td>(4) หัก เงินประกันผลงาน ${retP}% ของ (1)</td><td class="n">(${m2(mm.retention)})</td></tr>
+      <tr><td>(5) ยอดหลังหักเงินประกันผลงาน</td><td class="n">${m2(mm.after_retention)}</td></tr>
+      <tr><td>(6) หัก ภาษีเงินได้ ณ ที่จ่าย ${whtP}% ของ (1)</td><td class="n">(${m2(mm.wht)})</td></tr>
+      <tr class="b"><td>(7) ยอดชำระสุทธิ</td><td class="n">${m2(mm.net)}</td></tr>
+    </table>
+    <div class="bt">(${esc(r.net_text)})</div>
+    <h2>สรุปการเบิกเงินสะสม (ไม่รวมภาษีมูลค่าเพิ่ม)</h2>
+    <table>
+      <tr><td>มูลค่าตามสัญญา</td><td class="n">${m2(r.contract_value)}</td><td class="n">100.00%</td></tr>
+      <tr><td>เบิกงวดก่อนหน้าแล้ว</td><td class="n">${m2(r.prev.amount)}</td><td class="n">${pc(100 * r.prev.amount / r.contract_value, 2)}</td></tr>
+      <tr><td>เบิกงวดนี้</td><td class="n">${m2(mm.amount)}</td><td class="n">${pc(100 * mm.amount / r.contract_value, 2)}</td></tr>
+      <tr class="b"><td>เบิกสะสมรวมงวดนี้</td><td class="n">${m2(r.cum.amount)}</td><td class="n">${pc(100 * r.cum.amount / r.contract_value, 2)}</td></tr>
+      <tr><td>คงเหลือตามสัญญา</td><td class="n">${m2(r.contract_value - r.cum.amount)}</td><td class="n">${pc(100 - 100 * r.cum.amount / r.contract_value, 2)}</td></tr>
+      <tr><td>เงินประกันผลงานสะสม (ผู้ว่าจ้างหักไว้)</td><td class="n">${m2(r.cum.retention)}</td><td></td></tr>
+      <tr><td>ผลงานจริงสะสม ณ วันที่ ${esc(r.evidence_date_th)} (มูลค่าตาม BOQ ปรับเป็นมูลค่าสัญญา)</td><td class="n">${m2(r.earned_total)}</td><td class="n">${pc(r.earned_pct, 2)}</td></tr>
+    </table>
+    <p>จึงเรียนมาเพื่อโปรดพิจารณาตรวจรับงานและอนุมัติเบิกจ่าย</p>
+    <div class="sign">
+      <div>ลงชื่อ ................................<span>(................................)</span><span>ผู้รับจ้าง<br>${esc(M.contractor)}</span></div>
+      <div>ลงชื่อ ................................<span>(................................)</span><span>ผู้ควบคุมงาน / ผู้ตรวจรับ</span></div>
+      <div>ลงชื่อ ................................<span>(................................)</span><span>ผู้ว่าจ้าง<br>${esc(M.owner)}</span></div>
+    </div>
+    <p class="small" style="margin-top:22px">เอกสารแนบ: (1) ผลตรวจเงื่อนไขงวดและตารางงวดงาน (2) สรุปผลงานรายหมวด (3) ผลงานรายชั้น${r.photos.length ? " (4) รูปถ่ายประกอบ" : ""}</p>
+  </div>`;
+
+  const p2 = `<div class="page${dr}">
+    <h2>เอกสารแนบ 1 — ผลตรวจเงื่อนไขงวดที่ ${esc(m.no)} ณ วันที่ ${esc(r.evidence_date_th)}</h2>
+    <table><tr><th>เงื่อนไข</th><th class="n">ต้องการ</th><th class="n">ผลงาน</th><th>ผล</th></tr>
+      ${r.checks.map(c => `<tr><td>${esc(c.label)}</td><td class="n">≥ ${c.need}%</td><td class="n">${pc(c.pct)}</td><td class="${c.ok ? "ok" : "no"}">${c.ok ? "ผ่าน" : "ยังไม่ผ่าน"}</td></tr>`).join("")}</table>
+    <h2 style="margin-top:18px">ตารางงวดงานตามสัญญา</h2>
+    <table><tr><th>งวด</th><th class="n">%</th><th class="n">(1) มูลค่า</th><th class="n">(4) ประกัน</th><th class="n">(6) ณ ที่จ่าย</th><th class="n">(7) สุทธิ</th><th>สถานะ</th><th>ยื่น</th><th>รับเงิน</th></tr>
+      ${r.rows.map(x => `<tr class="${x.status === "this" ? "this" : ""}"><td>${esc(x.no)}</td><td class="n">${(x.pct * 100).toFixed(0)}</td><td class="n">${m2(x.money.amount)}</td><td class="n">${m2(x.money.retention)}</td><td class="n">${m2(x.money.wht)}</td><td class="n">${m2(x.money.net)}</td><td>${STAT[x.status] || ""}</td><td>${fd(x.submitted)}</td><td>${fd(x.paid)}</td></tr>`).join("")}
+      <tr class="b"><td>รวม</td><td class="n">100</td><td class="n">${m2(r.rows.reduce((s, x) => s + x.money.amount, 0))}</td><td class="n">${m2(r.rows.reduce((s, x) => s + x.money.retention, 0))}</td><td class="n">${m2(r.rows.reduce((s, x) => s + x.money.wht, 0))}</td><td class="n">${m2(r.rows.reduce((s, x) => s + x.money.net, 0))}</td><td colspan="3"></td></tr></table>
+  </div>`;
+
+  const p3 = `<div class="page${dr}">
+    <h2>เอกสารแนบ 2 — สรุปผลงานสะสมรายหมวด ณ วันที่ ${esc(r.evidence_date_th)}</h2>
+    <p class="small">มูลค่าแต่ละหมวดคิดจาก BOQ ปรับสัดส่วนให้รวมเท่ามูลค่าสัญญา (ไม่รวม VAT) · แผนตาม ${r.baseline_name ? "Baseline “" + esc(r.baseline_name) + "”" : "แผนปัจจุบัน"}</p>
+    <table><tr><th>หมวดงาน</th><th class="n">น้ำหนัก</th><th class="n">มูลค่า (บาท)</th><th class="n">แผน</th><th class="n">ผลงาน</th><th class="n">มูลค่าผลงาน</th></tr>
+      ${r.trades.map(tr => `<tr class="sub"><td>${esc(tr.name)}</td><td class="n">${pc(tr.weight, 2)}</td><td class="n">${m0(tr.value)}</td><td class="n">${pc(tr.plan_pct)}</td><td class="n">${pc(tr.pct)}</td><td class="n">${m0(tr.earned)}</td></tr>` +
+        tr.tasks.map(t => `<tr><td style="padding-left:16px">${esc(t.name)}</td><td class="n">${pc(t.weight, 2)}</td><td class="n">${m0(t.value)}</td><td class="n">${pc(t.plan_pct)}</td><td class="n">${pc(t.pct)}</td><td class="n">${m0(t.earned)}</td></tr>`).join("")).join("")}
+      <tr class="b"><td>รวมทั้งโครงการ</td><td class="n">100.00%</td><td class="n">${m0(r.contract_value)}</td><td class="n">${pc(r.plan_pct)}</td><td class="n">${pc(r.earned_pct)}</td><td class="n">${m0(r.earned_total)}</td></tr></table>
+  </div>`;
+
+  const p4 = `<div class="page${dr}">
+    <h2>เอกสารแนบ 3 — ผลงานรายชั้น ณ วันที่ ${esc(r.evidence_date_th)} (% ของแต่ละหมวดในชั้นนั้น)</h2>
+    <table class="mx"><tr><th>หมวดงาน</th>${r.floors.map(f => `<th>${esc(f.name)}</th>`).join("")}</tr>
+      ${r.matrix.map(row => `<tr><td>${esc(row.name)}</td>${r.floors.map(f => f.id in row.cells ? `<td class="${cls(row.cells[f.id])}">${Math.round(row.cells[f.id])}</td>` : "<td></td>").join("")}</tr>`).join("")}</table>
+    <p class="small">ช่องว่าง = ไม่มีงานหมวดนั้นในชั้นนั้น</p>
+  </div>`;
+  const p5 = r.photos.length ? `<div class="page${dr}">
+    <h2>เอกสารแนบ 4 — รูปถ่ายประกอบผลงาน ${r.photo_from ? "ช่วง " + fd(r.photo_from) + " – " : "ถึง "}${fd(r.evidence_date)}</h2>
+    <p class="small">แสดง ${r.photos.length} จาก ${r.photos_total} รูป (เฉพาะหมวดงานและชั้นในเงื่อนไขงวด ล่าสุดก่อน)</p>
+    <div class="pg">${r.photos.map(ph => `<figure><img src="/photos/${ph.file}"><figcaption>${esc(ph.task_name || "")}${ph.task_name ? " · " : ""}${esc(ph.loc_name)}${/^\d+$/.test(ph.floor) && !ph.loc_name.includes("ชั้น") ? " (ชั้น " + ph.floor + ")" : ""}<br>${fd(ph.date)}${ph.note ? " · " + esc(ph.note) : ""}</figcaption></figure>`).join("")}</div>
+  </div>` : "";
+  document.getElementById("doc").innerHTML = p1 + p2 + p3 + p4 + p5;
+}
+load();
+</script>
+</body>
+</html>
